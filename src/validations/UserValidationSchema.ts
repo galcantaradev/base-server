@@ -2,7 +2,7 @@ import * as Yup from 'yup';
 
 export const register = Yup.object().shape({
   name: Yup.string().required('Name is required').trim(),
-  email: Yup.string().email('E-mail is invalid').required('E-mail is required'),
+  email: Yup.string().email('Email is invalid').required('Email is required'),
   password: Yup.string()
     .test('password', "Password can't be empty", value => !!value?.trim())
     .required('Password is required')
@@ -14,6 +14,6 @@ export const register = Yup.object().shape({
 });
 
 export const login = Yup.object().shape({
-  email: Yup.string().email('E-mail is invalid').required('E-mail is required'),
+  email: Yup.string().email('Email is invalid').required('Email is required'),
   password: Yup.string().required('Password is required')
 });

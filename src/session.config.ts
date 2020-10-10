@@ -1,13 +1,13 @@
 import connectRedis from 'connect-redis';
 import session from 'express-session';
 
-import { __PROD__, SESSION_SECRET } from './constants';
+import { COOKIE_NAME, SESSION_SECRET, __PROD__ } from './constants';
 import { redisClient } from './redis.config';
 
 export const RedisStore = connectRedis(session);
 
 export default session({
-  name: 'qid',
+  name: COOKIE_NAME,
   store: new RedisStore({
     client: redisClient,
     disableTouch: true

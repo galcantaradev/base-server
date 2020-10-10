@@ -1,6 +1,5 @@
-import { ValidationError } from 'yup';
-
 import { FieldError } from '../common';
+import { ValidationError } from 'yup';
 
 export const yupErrorToFieldErrors = (error: ValidationError): FieldError[] => {
   return error.inner.map(ve => {

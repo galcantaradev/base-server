@@ -2,14 +2,14 @@ import 'reflect-metadata';
 
 import { MikroORM } from '@mikro-orm/core';
 import { ApolloServer } from 'apollo-server-express';
+import cors from 'cors';
 import express from 'express';
 import { buildSchema } from 'type-graphql';
 
 import { BaseContext } from './common';
 import { PORT } from './constants';
-import { UserResolver } from './resolvers';
-
 import mikroOrmConfig from './mikro-orm.config';
+import { UserResolver } from './resolvers';
 import sessionConfig from './session.config';
 
 const main = async () => {
@@ -18,6 +18,12 @@ const main = async () => {
 
   const app = express();
 
+  app.use(
+    cors({
+      credentials: true,
+      origin: 'http://localhost:3000'
+    })
+  );
   app.use(sessionConfig);
 
   const apolloServer = new ApolloServer({
@@ -28,7 +34,7 @@ const main = async () => {
     context: ({ req, res }): BaseContext => ({ em: orm.em, req, res })
   });
 
-  apolloServer.applyMiddleware({ app });
+  apolloServer.applyMiddleware({ app, cors: false });
 
   app.listen(PORT, () => console.log(`Server started on localhost:${PORT}`));
 };

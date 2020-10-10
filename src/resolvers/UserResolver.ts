@@ -10,7 +10,8 @@ import {
   Resolver
 } from 'type-graphql';
 
-import { BaseContext, Response } from '../common';
+import { BaseContext, FieldError, Response } from '../common';
+import { COOKIE_NAME } from '../constants';
 import { User } from '../entities';
 import { yupErrorToFieldErrors } from '../utils';
 import { UserValidationSchema } from '../validations';
@@ -69,12 +70,7 @@ export class UserResolver {
 
     if (emailExists) {
       return {
-        errors: [
-          {
-            field: 'email',
-            message: 'E-mail already exists'
-          }
-        ]
+        errors: [new FieldError('email', 'Email already exists')]
       };
     }
 
@@ -93,7 +89,7 @@ export class UserResolver {
     };
   }
 
-  @Query(_type => UserResponse)
+  @Mutation(_type => UserResponse)
   async login(
     @Arg('options', _type => UserLoginInput) options: UserLoginInput,
     @Ctx() { em, req }: BaseContext
@@ -114,12 +110,7 @@ export class UserResolver {
 
     if (!user) {
       return {
-        errors: [
-          {
-            field: 'email',
-            message: 'Wrong e-mail or password'
-          }
-        ]
+        errors: [new FieldError('email', 'Email is incorrect')]
       };
     }
 
@@ -127,12 +118,7 @@ export class UserResolver {
 
     if (!validPassword) {
       return {
-        errors: [
-          {
-            field: 'password',
-            message: 'Wrong e-mail or password'
-          }
-        ]
+        errors: [new FieldError('password', 'Password is incorrect')]
       };
     }
 
@@ -147,6 +133,22 @@ export class UserResolver {
     return {
       user
     };
+  }
+
+  @Mutation(_type => Boolean)
+  async logout(@Ctx() { req, res }: BaseContext): Promise<boolean> {
+    return new Promise(resolve => {
+      res.clearCookie(COOKIE_NAME);
+
+      req.session?.destroy(err => {
+        if (err) {
+          resolve(err);
+          return;
+        }
+
+        resolve(err);
+      });
+    });
   }
 
   @Query(_type => User, { nullable: true })
