@@ -70,7 +70,7 @@ export class UserResolver {
 
     if (emailExists) {
       return {
-        errors: [new FieldError('email', 'Email already exists')]
+        errors: [new FieldError('email', 'email already exists')]
       };
     }
 
@@ -110,7 +110,7 @@ export class UserResolver {
 
     if (!user) {
       return {
-        errors: [new FieldError('email', 'Email is incorrect')]
+        errors: [new FieldError('email', 'email is incorrect')]
       };
     }
 
@@ -118,7 +118,7 @@ export class UserResolver {
 
     if (!validPassword) {
       return {
-        errors: [new FieldError('password', 'Password is incorrect')]
+        errors: [new FieldError('password', 'password is incorrect')]
       };
     }
 
