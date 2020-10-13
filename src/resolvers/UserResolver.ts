@@ -52,7 +52,7 @@ export class UserResolver {
   @Mutation(_type => UserResponse)
   async register(
     @Arg('options', _type => UserRegisterInput) options: UserRegisterInput,
-    @Ctx() { em }: BaseContext
+    @Ctx() { em, req }: BaseContext
   ): Promise<UserResponse> {
     try {
       await UserValidationSchema.register.validate(options, {
@@ -83,6 +83,8 @@ export class UserResolver {
     });
 
     await em.persistAndFlush(user);
+
+    req.session!.userId = user.id;
 
     return {
       user
