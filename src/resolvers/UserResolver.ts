@@ -40,14 +40,26 @@ class UserLoginInput {
   password: string;
 }
 
+@InputType()
+class UserProfileInput {
+  @Field(_type => String)
+  name: string;
+
+  @Field(_type => String, { nullable: true })
+  email?: string;
+
+  @Field(_type => String, { nullable: true })
+  password?: string;
+}
+
 @ObjectType()
 class UserResponse extends Response {
   @Field(_type => User, { nullable: true })
   user?: User;
 }
 
-@ObjectType()
 @Resolver()
+@ObjectType()
 export class UserResolver {
   @Mutation(_type => UserResponse)
   async register(
@@ -165,5 +177,38 @@ export class UserResolver {
     const user = await em.findOne(User, { id: userId });
 
     return user;
+  }
+
+  @Mutation(_type => UserResponse, { nullable: true })
+  async profile(
+    @Arg('options', _type => UserProfileInput) options: UserProfileInput,
+    @Ctx() { em, req }: BaseContext
+  ): Promise<UserResponse> {
+    try {
+      await UserValidationSchema.profile.validate(options, {
+        abortEarly: false
+      });
+    } catch (error) {
+      const errors = yupErrorToFieldErrors(error);
+
+      return {
+        errors
+      };
+    }
+
+    const user = (await em.findOne(User, { id: req.session?.userId })) as User;
+
+    user.name = options.name;
+
+    if (options.password) {
+      const hashedPassword = await argon2.hash(options.password);
+      user.password = hashedPassword;
+    }
+
+    await em.flush();
+
+    return {
+      user
+    };
   }
 }
