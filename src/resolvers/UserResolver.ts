@@ -9,11 +9,12 @@ import {
   Query,
   Resolver
 } from 'type-graphql';
+import { v4 } from 'uuid';
 
 import { BaseContext, FieldError, Response } from '../common';
-import { COOKIE_NAME } from '../constants';
+import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from '../constants';
 import { User } from '../entities';
-import { yupErrorToFieldErrors } from '../utils';
+import { sendEmail, yupErrorToFieldErrors } from '../utils';
 import { UserValidationSchema } from '../validations';
 
 @InputType()
@@ -50,6 +51,15 @@ class UserProfileInput {
 
   @Field(_type => String, { nullable: true })
   password?: string;
+}
+
+@InputType()
+class ChangePasswordInput {
+  @Field(_type => String)
+  password: string;
+
+  @Field(_type => String)
+  passwordConfirmation: string;
 }
 
 @ObjectType()
@@ -206,6 +216,82 @@ export class UserResolver {
     }
 
     await em.flush();
+
+    return {
+      user
+    };
+  }
+
+  @Mutation(_type => Response, { nullable: true })
+  async forgotPassword(
+    @Arg('email') email: string,
+    @Ctx() { em, redis }: BaseContext
+  ): Promise<Response | void> {
+    const user = await em.findOne(User, { email });
+
+    if (!user) {
+      return {
+        errors: [new FieldError('email', "that email doesn't exist")]
+      };
+    }
+
+    const token = v4();
+
+    await redis.set(
+      `${FORGET_PASSWORD_PREFIX}_${token}`,
+      user.id,
+      'ex',
+      1000 * 60 * 60 * 24 // 1 day
+    );
+
+    await sendEmail({
+      to: email,
+      html: `<a href="http://localhost:3000/change-password/${token}">reset password</a>`
+    });
+  }
+
+  @Mutation(_type => UserResponse)
+  async changePassword(
+    @Arg('token', _type => String) token: string,
+    @Arg('options', _type => ChangePasswordInput) options: ChangePasswordInput,
+    @Ctx() { em, redis, req }: BaseContext
+  ): Promise<UserResponse | void> {
+    try {
+      await UserValidationSchema.changePassword.validate(options, {
+        abortEarly: false
+      });
+    } catch (error) {
+      const errors = yupErrorToFieldErrors(error);
+
+      return {
+        errors
+      };
+    }
+
+    const redisKey = `${FORGET_PASSWORD_PREFIX}_${token}`;
+    const userId = await redis.get(redisKey);
+
+    if (!userId) {
+      return {
+        errors: [new FieldError('token', 'token expired')]
+      };
+    }
+
+    const user = await em.findOne(User, { id: userId });
+
+    if (!user) {
+      return {
+        errors: [new FieldError('token', 'user no longer exists')]
+      };
+    }
+
+    user.password = await argon2.hash(options.password);
+    await em.flush();
+
+    await redis.del(redisKey);
+
+    // log in user after change password
+    req.session!.userId = user.id;
 
     return {
       user

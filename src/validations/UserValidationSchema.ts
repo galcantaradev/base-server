@@ -29,3 +29,13 @@ export const login = Yup.object().shape({
   email: Yup.string().email('email is invalid').required('email is required'),
   password: Yup.string().required('password is required')
 });
+
+export const changePassword = Yup.object().shape({
+  password: Yup.string()
+    .required('password is required')
+    .min(7, 'password must be greater than 6'),
+  passwordConfirmation: Yup.string().oneOf(
+    [Yup.ref('password')],
+    'passwords must match'
+  )
+});

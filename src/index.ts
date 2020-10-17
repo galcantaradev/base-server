@@ -11,6 +11,7 @@ import { PORT } from './constants';
 import mikroOrmConfig from './mikro-orm.config';
 import { UserResolver } from './resolvers';
 import sessionConfig from './session.config';
+import { redis } from './redis.config';
 
 const main = async () => {
   const orm = await MikroORM.init(mikroOrmConfig);
@@ -31,7 +32,7 @@ const main = async () => {
       resolvers: [UserResolver],
       validate: false
     }),
-    context: ({ req, res }): BaseContext => ({ em: orm.em, req, res })
+    context: ({ req, res }): BaseContext => ({ em: orm.em, req, res, redis })
   });
 
   apolloServer.applyMiddleware({ app, cors: false });
