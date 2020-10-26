@@ -1,6 +1,5 @@
 import 'reflect-metadata';
 
-import { MikroORM } from '@mikro-orm/core';
 import { ApolloServer } from 'apollo-server-express';
 import cors from 'cors';
 import express from 'express';
@@ -8,14 +7,15 @@ import { buildSchema } from 'type-graphql';
 
 import { BaseContext } from './common';
 import { PORT } from './constants';
-import mikroOrmConfig from './mikro-orm.config';
 import { UserResolver } from './resolvers';
 import sessionConfig from './session.config';
 import { redis } from './redis.config';
 
+import { createConnection } from 'typeorm';
+import typeormConfig from './typeorm.config';
+
 const main = async () => {
-  const orm = await MikroORM.init(mikroOrmConfig);
-  await orm.getMigrator().up();
+  await createConnection(typeormConfig);
 
   const app = express();
 
@@ -32,7 +32,7 @@ const main = async () => {
       resolvers: [UserResolver],
       validate: false
     }),
-    context: ({ req, res }): BaseContext => ({ em: orm.em, req, res, redis })
+    context: ({ req, res }): BaseContext => ({ req, res, redis })
   });
 
   apolloServer.applyMiddleware({ app, cors: false });

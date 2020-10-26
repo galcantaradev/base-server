@@ -7,13 +7,15 @@ import {
   Mutation,
   ObjectType,
   Query,
-  Resolver
+  Resolver,
+  UseMiddleware
 } from 'type-graphql';
 import { v4 } from 'uuid';
 
 import { BaseContext, FieldError, Response } from '../common';
 import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from '../constants';
 import { User } from '../entities';
+import { isAuthenticated } from '../middlewares';
 import { sendEmail, yupErrorToFieldErrors } from '../utils';
 import { UserValidationSchema } from '../validations';
 
@@ -74,7 +76,7 @@ export class UserResolver {
   @Mutation(_type => UserResponse)
   async register(
     @Arg('options', _type => UserRegisterInput) options: UserRegisterInput,
-    @Ctx() { em, req }: BaseContext
+    @Ctx() { req }: BaseContext
   ): Promise<UserResponse> {
     try {
       await UserValidationSchema.register.validate(options, {
@@ -88,7 +90,7 @@ export class UserResolver {
       };
     }
 
-    const emailExists = await em.findOne(User, { email: options.email });
+    const emailExists = await User.findOne({ where: { email: options.email } });
 
     if (emailExists) {
       return {
@@ -98,13 +100,11 @@ export class UserResolver {
 
     const hashedPassword = await argon2.hash(options.password);
 
-    const user = await em.create(User, {
+    const user = await User.create({
       name: options.name,
       email: options.email,
       password: hashedPassword
-    });
-
-    await em.persistAndFlush(user);
+    }).save();
 
     req.session!.userId = user.id;
 
@@ -116,7 +116,7 @@ export class UserResolver {
   @Mutation(_type => UserResponse)
   async login(
     @Arg('options', _type => UserLoginInput) options: UserLoginInput,
-    @Ctx() { em, req }: BaseContext
+    @Ctx() { req }: BaseContext
   ): Promise<UserResponse> {
     try {
       await UserValidationSchema.login.validate(options, {
@@ -130,7 +130,7 @@ export class UserResolver {
       };
     }
 
-    const user = await em.findOne(User, { email: options.email });
+    const user = await User.findOne({ where: { email: options.email } });
 
     if (!user) {
       return {
@@ -175,24 +175,17 @@ export class UserResolver {
     });
   }
 
+  @UseMiddleware(isAuthenticated)
   @Query(_type => User, { nullable: true })
-  async me(@Ctx() { em, req }: BaseContext): Promise<User | null> {
-    const userId = req.session?.userId;
-
-    // not logged in
-    if (!userId) {
-      return null;
-    }
-
-    const user = await em.findOne(User, { id: userId });
-
-    return user;
+  async me(@Ctx() { req }: BaseContext): Promise<User | null | undefined> {
+    return User.findOne(req.session?.userId);
   }
 
+  @UseMiddleware(isAuthenticated)
   @Mutation(_type => UserResponse, { nullable: true })
   async profile(
     @Arg('options', _type => UserProfileInput) options: UserProfileInput,
-    @Ctx() { em, req }: BaseContext
+    @Ctx() { req }: BaseContext
   ): Promise<UserResponse> {
     try {
       await UserValidationSchema.profile.validate(options, {
@@ -206,28 +199,30 @@ export class UserResolver {
       };
     }
 
-    const user = (await em.findOne(User, { id: req.session?.userId })) as User;
+    const user = (await User.findOne(req.session?.userId)) as User;
+    const updates: Partial<User> = {};
 
-    user.name = options.name;
+    updates.name = options.name;
 
     if (options.password) {
       const hashedPassword = await argon2.hash(options.password);
-      user.password = hashedPassword;
+      updates.password = hashedPassword;
     }
 
-    await em.flush();
+    await User.update(user.id, updates);
+    const updatedUser = await User.findOne(user.id);
 
     return {
-      user
+      user: updatedUser
     };
   }
 
   @Mutation(_type => Response, { nullable: true })
   async forgotPassword(
     @Arg('email') email: string,
-    @Ctx() { em, redis }: BaseContext
+    @Ctx() { redis }: BaseContext
   ): Promise<Response | void> {
-    const user = await em.findOne(User, { email });
+    const user = await User.findOne({ where: { email } });
 
     if (!user) {
       return {
@@ -254,7 +249,7 @@ export class UserResolver {
   async changePassword(
     @Arg('token', _type => String) token: string,
     @Arg('options', _type => ChangePasswordInput) options: ChangePasswordInput,
-    @Ctx() { em, redis, req }: BaseContext
+    @Ctx() { redis, req }: BaseContext
   ): Promise<UserResponse | void> {
     try {
       await UserValidationSchema.changePassword.validate(options, {
@@ -277,7 +272,7 @@ export class UserResolver {
       };
     }
 
-    const user = await em.findOne(User, { id: userId });
+    const user = await User.findOne(userId);
 
     if (!user) {
       return {
@@ -285,8 +280,9 @@ export class UserResolver {
       };
     }
 
-    user.password = await argon2.hash(options.password);
-    await em.flush();
+    const password = await argon2.hash(options.password);
+
+    await User.update({ id: userId }, { password });
 
     await redis.del(redisKey);
 

@@ -1,23 +1,36 @@
-import { Entity, PrimaryKey, Property } from '@mikro-orm/core';
 import { Field, ObjectType } from 'type-graphql';
-
-import { Timestamps } from './Timestamps';
+import {
+  BaseEntity,
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn
+} from 'typeorm';
 
 @Entity()
 @ObjectType()
-export class User extends Timestamps {
+export class User extends BaseEntity {
   @Field(_type => String)
-  @PrimaryKey({ type: 'uuid', defaultRaw: 'uuid_generate_v4()' })
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Field(_type => String)
-  @Property({ type: 'text' })
+  @Column({ type: 'text' })
   name: string;
 
   @Field(_type => String)
-  @Property({ type: 'text', unique: true })
+  @Column({ unique: true })
   email: string;
 
-  @Property({ type: 'text' })
+  @Column({ type: 'text' })
   password: string;
+
+  @Field(_type => String)
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @Field(_type => String)
+  @UpdateDateColumn()
+  updatedAt: Date;
 }
