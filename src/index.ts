@@ -4,14 +4,13 @@ import { ApolloServer } from 'apollo-server-express';
 import cors from 'cors';
 import express from 'express';
 import { buildSchema } from 'type-graphql';
+import { createConnection } from 'typeorm';
 
 import { BaseContext } from './common';
 import { PORT } from './constants';
 import { UserResolver } from './resolvers';
+import redisConfig from './redis.config';
 import sessionConfig from './session.config';
-import { redis } from './redis.config';
-
-import { createConnection } from 'typeorm';
 import typeormConfig from './typeorm.config';
 
 const main = async () => {
@@ -32,7 +31,7 @@ const main = async () => {
       resolvers: [UserResolver],
       validate: false
     }),
-    context: ({ req, res }): BaseContext => ({ req, res, redis })
+    context: ({ req, res }): BaseContext => ({ req, res, redis: redisConfig })
   });
 
   apolloServer.applyMiddleware({ app, cors: false });
